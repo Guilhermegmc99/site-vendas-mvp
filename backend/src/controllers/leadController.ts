@@ -2,8 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/database';
 import { createError } from '../middleware/errorHandler';
-import { Request } from '../middleware/auth';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 export const createLead = async (
   req: Request,
