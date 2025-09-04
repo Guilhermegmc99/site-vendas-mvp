@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: site-vendas-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: PORT
+        value: 10000
+      - key: UPLOAD_PATH
+        value: uploads
+      - key: MAX_FILE_SIZE
+        value: 3145728
+      - key: DEFAULT_WHATSAPP_NUMBER
+        value: 5562999999999
+      - key: FRONTEND_URL
+        value: https://site-vendas-mvp.vercel.app
+
+databases:
+  - name: site-vendas-db
+    plan: free
+    databaseName: site_vendas
+    user: site_vendas_user
