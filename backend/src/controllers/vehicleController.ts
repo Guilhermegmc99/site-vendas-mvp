@@ -1,12 +1,11 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/database';
 import { createError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../middleware/auth';
 import { generateUniqueSlug } from '../utils/slug';
 
 export const createVehicle = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -67,7 +66,7 @@ export const createVehicle = async (
 };
 
 export const getVehicles = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -198,24 +197,6 @@ export const getPublicVehicles = async (
             select: { id: true, name: true }
           }
         },
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          price: true,
-          year: true,
-          mileageKm: true,
-          transmission: true,
-          fuel: true,
-          color: true,
-          location: true,
-          description: true,
-          // plate é omitido para usuários não autenticados
-          status: true,
-          createdAt: true,
-          images: true,
-          user: true
-        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limitNum
@@ -282,7 +263,7 @@ export const getVehicleById = async (
 };
 
 export const updateVehicle = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -361,7 +342,7 @@ export const updateVehicle = async (
 };
 
 export const deleteVehicle = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/database';
 import { createError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { Request } from '../middleware/auth';
 import crypto from 'crypto';
 
 export const createLead = async (
@@ -82,7 +82,7 @@ export const createLead = async (
 };
 
 export const getLeads = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -152,7 +152,7 @@ export const getLeads = async (
 };
 
 export const getLeadStats = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {

@@ -3,16 +3,20 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/database';
 import { createError } from './errorHandler';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-  };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        name: string;
+      };
+    }
+  }
 }
 
 export const authenticate = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
