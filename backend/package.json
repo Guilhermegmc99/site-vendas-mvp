@@ -11,7 +11,9 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node prisma/seed.ts",
     "db:init": "node scripts/init-db.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
   },
   "keywords": ["nodejs", "express", "postgresql", "prisma"],
   "author": "Guilherme",
