@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { mockVehicles } from "@/data/mock-vehicles";
+import { useAuth } from "@/contexts/AuthContext";
+import apiService, { Vehicle } from "@/services/api";
 import { 
   Plus, 
   Search, 
@@ -16,7 +17,8 @@ import {
   Users, 
   MessageCircle,
   MoreHorizontal,
-  LogOut
+  LogOut,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,44 +26,83 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalVehicles: 0,
+    activeVehicles: 0,
+    totalViews: 0,
+    leadsGenerated: 0
+  });
+  
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, logout } = useAuth();
 
-  // Mock user data
-  const user = {
-    name: "João Silva",
-    email: "admin@autovendas.com"
+  useEffect(() => {
+    loadVehicles();
+    loadStats();
+  }, []);
+
+  const loadVehicles = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getVehicles({
+        search: searchTerm
+      });
+      setVehicles(response.vehicles);
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      toast.error('Erro ao carregar veículos');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Filter vehicles (mock - in real app, filter by user)
-  const userVehicles = mockVehicles.filter(vehicle => 
-    vehicle.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const stats = {
-    totalVehicles: userVehicles.length,
-    activeVehicles: userVehicles.filter(v => v.status === 'active').length,
-    totalViews: 1247,
-    leadsGenerated: 89
+  const loadStats = async () => {
+    try {
+      const response = await apiService.getLeadStats();
+      setStats({
+        totalVehicles: vehicles.length,
+        activeVehicles: vehicles.filter(v => v.status === 'ACTIVE').length,
+        totalViews: 0, // TODO: Implementar contador de views
+        leadsGenerated: response.stats.totalLeads
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
   };
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      loadVehicles();
+    }, 300);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchTerm]);
 
   const handleLogout = () => {
-    toast({
-      title: "Logout realizado",
-      description: "Você foi desconectado com sucesso.",
-    });
+    logout();
+    toast.success("Logout realizado com sucesso!");
     navigate("/");
   };
 
-  const handleDeleteVehicle = (vehicleId: string, vehicleTitle: string) => {
-    toast({
-      title: "Veículo removido",
-      description: `${vehicleTitle} foi removido com sucesso.`,
-    });
+  const handleDeleteVehicle = async (vehicleId: string, vehicleTitle: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir "${vehicleTitle}"?`)) {
+      return;
+    }
+
+    try {
+      await apiService.deleteVehicle(vehicleId);
+      toast.success(`${vehicleTitle} foi removido com sucesso.`);
+      loadVehicles(); // Recarregar lista
+      loadStats(); // Atualizar estatísticas
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao excluir veículo');
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -89,8 +130,8 @@ const Dashboard = () => {
 
           <div className="flex items-center space-x-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{user.name}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="text-sm font-medium text-foreground">{user?.name}</p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
             <Button 
               variant="outline" 
@@ -109,7 +150,7 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-foreground mb-2">
-            Bem-vindo, {user.name}!
+            Bem-vindo, {user?.name}!
           </h2>
           <p className="text-muted-foreground">
             Gerencie seus veículos e acompanhe suas vendas
@@ -206,32 +247,47 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* Vehicle List */}
-            <div className="space-y-4">
-              {userVehicles.map((vehicle) => (
+            {/* Loading State */}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Carregando veículos...</span>
+              </div>
+            ) : (
+              /* Vehicle List */
+              <div className="space-y-4">
+                {vehicles.map((vehicle) => (
                 <div 
                   key={vehicle.id}
                   className="flex items-center justify-between p-4 border border-border/50 rounded-lg hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center space-x-4">
                     <img
-                      src={vehicle.images[0] || "/placeholder.svg"}
+                      src={vehicle.images?.[0]?.url || "/placeholder.svg"}
                       alt={vehicle.title}
                       className="w-16 h-12 object-cover rounded-lg"
                     />
                     <div>
                       <h3 className="font-semibold text-foreground">{vehicle.title}</h3>
                       <p className="text-sm text-muted-foreground">{vehicle.location}</p>
+                      {vehicle.plate && (
+                        <p className="text-xs text-muted-foreground">Placa: {vehicle.plate}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge 
-                          variant={vehicle.status === 'active' ? 'default' : 'secondary'}
-                          className={vehicle.status === 'active' ? 'bg-success text-success-foreground' : ''}
+                          variant={vehicle.status === 'ACTIVE' ? 'default' : 'secondary'}
+                          className={vehicle.status === 'ACTIVE' ? 'bg-success text-success-foreground' : ''}
                         >
-                          {vehicle.status === 'active' ? 'Ativo' : 'Inativo'}
+                          {vehicle.status === 'ACTIVE' ? 'Ativo' : vehicle.status === 'SOLD' ? 'Vendido' : 'Inativo'}
                         </Badge>
                         <span className="text-sm font-medium text-primary">
                           {formatPrice(vehicle.price)}
                         </span>
+                        {vehicle._count?.leads && vehicle._count.leads > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {vehicle._count.leads} leads
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -267,9 +323,9 @@ const Dashboard = () => {
                     </DropdownMenu>
                   </div>
                 </div>
-              ))}
+                ))}
 
-              {userVehicles.length === 0 && (
+                {vehicles.length === 0 && (
                 <div className="text-center py-12">
                   <Car className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -285,8 +341,9 @@ const Dashboard = () => {
                     </Link>
                   </Button>
                 </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

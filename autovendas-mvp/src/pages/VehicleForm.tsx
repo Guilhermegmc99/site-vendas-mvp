@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { getVehicleById } from "@/data/mock-vehicles";
+import { useAuth } from "@/contexts/AuthContext";
+import apiService, { Vehicle } from "@/services/api";
 import { 
   ArrowLeft, 
   Upload, 
@@ -16,36 +17,72 @@ import {
   Car, 
   Save,
   Eye,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const VehicleForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const isEditing = id !== "new";
-  const existingVehicle = isEditing ? getVehicleById(id!) : null;
-
+  
   // Form state
   const [formData, setFormData] = useState({
-    title: existingVehicle?.title || "",
-    description: existingVehicle?.description || "",
-    price: existingVehicle?.price || 0,
-    year: existingVehicle?.year || new Date().getFullYear(),
-    mileage: existingVehicle?.mileage || 0,
-    fuel: existingVehicle?.fuel || "",
-    transmission: existingVehicle?.transmission || "",
-    color: existingVehicle?.color || "",
-    location: existingVehicle?.location || "",
-    status: existingVehicle?.status === "active" || false,
-    features: existingVehicle?.features.join(", ") || ""
+    title: "",
+    description: "",
+    price: 0,
+    year: new Date().getFullYear(),
+    mileageKm: 0,
+    fuel: "",
+    transmission: "",
+    color: "",
+    location: "",
+    plate: "",
+    status: "ACTIVE" as "ACTIVE" | "INACTIVE" | "SOLD"
   });
 
-  const [images, setImages] = useState<string[]>(existingVehicle?.images || []);
+  const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingVehicle, setLoadingVehicle] = useState(isEditing);
+
+  useEffect(() => {
+    if (isEditing && id) {
+      loadVehicle(id);
+    }
+  }, [isEditing, id]);
+
+  const loadVehicle = async (vehicleId: string) => {
+    try {
+      setLoadingVehicle(true);
+      const response = await apiService.getVehicleById(vehicleId);
+      const vehicle = response.vehicle;
+      
+      setFormData({
+        title: vehicle.title,
+        description: vehicle.description,
+        price: vehicle.price,
+        year: vehicle.year,
+        mileageKm: vehicle.mileageKm,
+        fuel: vehicle.fuel,
+        transmission: vehicle.transmission,
+        color: vehicle.color,
+        location: vehicle.location,
+        plate: vehicle.plate || "",
+        status: vehicle.status
+      });
+      
+      setImages(vehicle.images?.map(img => img.url) || []);
+    } catch (error: any) {
+      toast.error('Erro ao carregar veículo: ' + error.message);
+      navigate('/dashboard');
+    } finally {
+      setLoadingVehicle(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -74,16 +111,35 @@ const VehicleForm = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock save delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const vehicleData = {
+        title: formData.title,
+        description: formData.description,
+        price: formData.price,
+        year: formData.year,
+        mileageKm: formData.mileageKm,
+        fuel: formData.fuel,
+        transmission: formData.transmission,
+        color: formData.color,
+        location: formData.location,
+        plate: formData.plate || undefined,
+        status: formData.status
+      };
 
-    toast({
-      title: isEditing ? "Veículo atualizado!" : "Veículo cadastrado!",
-      description: `${formData.title} foi ${isEditing ? "atualizado" : "cadastrado"} com sucesso.`,
-    });
+      if (isEditing && id) {
+        await apiService.updateVehicle(id, vehicleData);
+        toast.success(`${formData.title} foi atualizado com sucesso!`);
+      } else {
+        await apiService.createVehicle(vehicleData);
+        toast.success(`${formData.title} foi cadastrado com sucesso!`);
+      }
 
-    navigate("/dashboard");
-    setIsLoading(false);
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar veículo');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const currentYear = new Date().getFullYear();
@@ -129,7 +185,13 @@ const VehicleForm = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-8">
+        {loadingVehicle ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Carregando veículo...</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-8">
           {/* Basic Information */}
           <Card className="border-0 shadow-soft bg-gradient-card">
             <CardHeader>
@@ -185,18 +247,35 @@ const VehicleForm = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="mileage" className="text-sm font-medium text-foreground">
+                  <Label htmlFor="mileageKm" className="text-sm font-medium text-foreground">
                     Quilometragem (km) *
                   </Label>
                   <Input
-                    id="mileage"
+                    id="mileageKm"
                     type="number"
                     placeholder="25000"
-                    value={formData.mileage || ""}
-                    onChange={(e) => handleInputChange("mileage", Number(e.target.value))}
+                    value={formData.mileageKm || ""}
+                    onChange={(e) => handleInputChange("mileageKm", Number(e.target.value))}
                     className="mt-1 border-border/50 focus:border-primary"
                     required
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="plate" className="text-sm font-medium text-foreground">
+                    Placa (Opcional)
+                  </Label>
+                  <Input
+                    id="plate"
+                    placeholder="ABC1234"
+                    value={formData.plate}
+                    onChange={(e) => handleInputChange("plate", e.target.value.toUpperCase())}
+                    className="mt-1 border-border/50 focus:border-primary"
+                    maxLength={7}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Visível apenas para você. Formato: ABC1234 ou ABC1D23
+                  </p>
                 </div>
 
                 <div>
@@ -396,7 +475,10 @@ const VehicleForm = () => {
               className="bg-gradient-primary hover:bg-primary-dark text-primary-foreground shadow-soft hover:shadow-glow transition-all duration-300"
             >
               {isLoading ? (
-                "Salvando..."
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
@@ -406,6 +488,7 @@ const VehicleForm = () => {
             </Button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
